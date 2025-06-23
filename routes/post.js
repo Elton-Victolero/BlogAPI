@@ -9,7 +9,7 @@ const router = express.Router();
 router.post("/addPost", verify, postController.addPost);
 
 //[SECTION] get-all-posts
-router.get("/getPosts", verify, postController.getAllPosts);
+router.get("/getPosts", postController.getAllPosts);
 
 //[SECTION] get-single-post
 router.get("/getPost/:postId", verify, postController.getPost);
