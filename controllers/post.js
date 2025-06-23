@@ -50,6 +50,7 @@ module.exports.getAllPosts = (req, res) => {
     .then(count => {
       totalCount = count;
       return Post.find({})
+        .populate('author', 'username profileImage')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit);
@@ -67,6 +68,7 @@ module.exports.getAllPosts = (req, res) => {
 //[SECTION] retrieve-single-post
 module.exports.getPost = (req, res) => {
   Post.findById(req.params.postId)
+    .populate('author', 'username profileImage')
     .then(post => {
       if (!post) {
         return res.status(404).send({ error: "Post not found" });
