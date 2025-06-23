@@ -1,20 +1,24 @@
 // [SECTION] Dependencies
 const express = require("express");
 const mongoose = require("mongoose");
+const cors = require("cors");
+
+// [SECTION] Environment Setup
+require('dotenv').config();
 
 // [SECTION] Routes Middleware
 const postRoutes = require("./routes/post");
 const userRoutes = require("./routes/user");
 
-// [SECTION] Environment Setup
-require('dotenv').config();
-
-// [SECTION] Server Setup
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 // [SECTION] Database Connection
-mongoose.connect(process.env.MONGODB_STRING);
+mongoose.connect(process.env.MONGODB_STRING, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+});
 mongoose.connection.once('open', () => console.log('Now connected to MongoDB Atlas'))
 
 app.use("/posts", postRoutes);
