@@ -11,10 +11,11 @@ const postRoutes = require("./routes/post");
 const userRoutes = require("./routes/user");
 
 const app = express();
+app.use(express.json());
+
 app.use(cors({
 	origin: ["http://localhost:3000", "https://blogapi-3cr8.onrender.com"]
 }));
-app.use(express.json());
 
 // [SECTION] Database Connection
 mongoose.connect(process.env.MONGODB_STRING, {
@@ -26,10 +27,10 @@ mongoose.connection.once('open', () => console.log('Now connected to MongoDB Atl
 app.use("/posts", postRoutes);
 app.use("/users", userRoutes);
 
-if(require.main === module){
-	app.listen(process.env.PORT || 4000, () => {
-	    console.log(`API is now online on port ${ process.env.PORT || 4000 }`)
-	});
-}
+// if(require.main === module){
+// 	app.listen(process.env.PORT || 4000, () => {
+// 	    console.log(`API is now online on port ${ process.env.PORT || 4000 }`)
+// 	});
+// }
 	
 module.exports = {app,mongoose};
