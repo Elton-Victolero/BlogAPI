@@ -11,7 +11,9 @@ const postRoutes = require("./routes/post");
 const userRoutes = require("./routes/user");
 
 const app = express();
-app.use(cors());
+app.use(cors({
+	origin: ["http://localhost:3000", "https://blogapi-3cr8.onrender.com"]
+}));
 app.use(express.json());
 
 // [SECTION] Database Connection
