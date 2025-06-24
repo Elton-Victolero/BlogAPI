@@ -213,6 +213,7 @@ module.exports.getPostComments = (req, res) => {
     const postId = req.params.postId;
 
     Post.findById(postId)
+        .populate('comments.userId', 'username')
         .then(post => {
             if (!post) {
                 return res.status(404).send({ error: "Post not found" });
