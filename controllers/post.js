@@ -69,6 +69,7 @@ module.exports.getAllPosts = (req, res) => {
 module.exports.getPost = (req, res) => {
   Post.findById(req.params.postId)
     .populate('author', 'username profileImage')
+    .populate('comments.userId', 'username')
     .then(post => {
       if (!post) {
         return res.status(404).send({ error: "Post not found" });
