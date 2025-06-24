@@ -1,228 +1,193 @@
-//[SECTION] Activity: Dependencies and Modules
-const Post = require("../models/Posts.js");
-const { errorHandler } = require("../auth.js") ;
+import { useState, useContext } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card, Form, Button, Row, Col, Modal } from "react-bootstrap";
+import Swal from "sweetalert2";
+import UserContext from "../UserContext";
 
-//reformat date
-const formatDate = date => {
-  return new Date(date).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: '2-digit'
-  });
-};
+export default function AddPostPage() {
+  const { user } = useContext(UserContext);
+  const navigate = useNavigate();
 
-const formatPost = post => ({
-  ...post.toObject(),
-  createdAt: formatDate(post.createdAt),
-  updatedAt: formatDate(post.updatedAt)
-});
-
-
-// [SECTION] create-post
-module.exports.addPost = (req, res) => {
-  const { title, content, coverImage } = req.body;
-
-  if (!title || !content) {
-    return res.status(400).send({ error: "Title and content are required" });
-  }
-
-  const newPost = new Post({
-    title,
-    content,
-    coverImage,
-    author: req.user.id
+  const [postData, setPostData] = useState({
+    title: "",
+    content: "",
+    coverImage: ""
   });
 
-  newPost.save()
-    .then(result => res.status(201).send(formatPost(result)))
-    .catch(error => errorHandler(error, req, res));
-};
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editPostId, setEditPostId] = useState(null); // for update reference
 
+  const handleChange = (e) => {
+    setPostData({ ...postData, [e.target.name]: e.target.value });
+  };
 
-//[SECTION] retrieve-all-posts
-module.exports.getAllPosts = (req, res) => {
-  const skip = parseInt(req.query.skip) || 0;
-  const limit = parseInt(req.query.limit) || 10;
+  const handleSubmit = (e) => {
+    e.preventDefault();
 
-  let totalCount;
-
-  Post.countDocuments()
-    .then(count => {
-      totalCount = count;
-      return Post.find({})
-        .populate('author', 'username profileImage')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit);
+    fetch(`${process.env.REACT_APP_API_URL}/posts/addPost`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`
+      },
+      body: JSON.stringify(postData)
     })
-    .then(posts => {
-      const hasMore = skip + posts.length < totalCount;
-      const formattedPosts = posts.map(formatPost);
-
-      res.status(200).send({ posts: formattedPosts, hasMore });
-    })
-    .catch(error => errorHandler(error, req, res));
-};
-
-
-//[SECTION] retrieve-single-post
-module.exports.getPost = (req, res) => {
-  Post.findById(req.params.postId)
-    .populate('author', 'username profileImage')
-    .then(post => {
-      if (!post) {
-        return res.status(404).send({ error: "Post not found" });
-      }
-      return res.status(200).send(formatPost(post));
-    })
-    .catch(error => errorHandler(error, req, res));
-};
-
-module.exports.updatePost = (req, res) => {
-  const { title, content, coverImage } = req.body;
-
-  Post.findById(req.params.postId)
-    .then(post => {
-      if (!post) {
-        return res.status(404).send({ error: "Post not found" });
-      }
-
-      if (post.author.toString() !== req.user.id) {
-        return res.status(403).send({ error: "Unauthorized to update this post" });
-      }
-
-      if (title !== undefined) post.title = title;
-      if (content !== undefined) post.content = content;
-      if (coverImage !== undefined) post.coverImage = coverImage;
-
-      return post.save();
-    })
-    .then(updatedPost => {
-      if (updatedPost) {
-        res.status(200).send({
-          success: true,
-          message: "Post updated successfully",
-          post: formatPost(updatedPost)
-        });
-      }
-    })
-    .catch(error => errorHandler(error, req, res));
-};
-
-
-module.exports.deletePost = (req, res) => {
-  const postId = req.params.postId;
-
-  Post.findById(postId)
-    .then(post => {
-      if (!post) {
-        return res.status(404).send({ error: "Post not found" });
-      }
-
-      if (post.author.toString() !== req.user.id && !req.user.isAdmin) {
-        return res.status(403).send({ error: "Unauthorized to delete this post" });
-      }
-
-      return Post.findByIdAndDelete(postId);
-    })
-    .then(() => {
-      res.status(200).send({
-        success: true,
-        message: "Post deleted successfully"
+      .then(res => res.json())
+      .then(data => {
+        Swal.fire("Success!", "Post added successfully!", "success");
+        navigate(`/posts/${data._id}`);
+      })
+      .catch(() => {
+        Swal.fire("Error", "Failed to add post", "error");
       });
+  };
+
+  const handleUpdate = () => {
+    fetch(`${process.env.REACT_APP_API_URL}/posts/updatePost/${editPostId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`
+      },
+      body: JSON.stringify(postData)
     })
-    .catch(error => errorHandler(error, req, res));
-};
-
-
-// [SECTION] add-post-comment
-module.exports.addPostComment = (req, res) => {
-    if (!req.user) {
-        return res.status(401).send({
-            auth: "Failed",
-            message: "User authentication required"
-        });
-    }
-
-    const postId = req.params.postId;
-    const commentData = {
-        userId: req.user.id,
-        comment: req.body.comment
-    };
-
-    Post.findById(postId)
-        .then(post => {
-            if (!post) {
-                return res.status(404).send({ error: "Post not found" });
-            }
-
-            post.comments.push(commentData);
-            return post.save();
-        })
-        .then(updatedPost => {
-            res.status(200).send({
-                message: "Comment added successfully",
-                comments: updatedPost.comments
-            });
-        })
-        .catch(error => errorHandler(error, req, res));
-};
-
-module.exports.deletePostComment = (req, res) => {
-  const postId = req.params.postId;
-  const commentId = req.params.commentId;
-
-  Post.findById(postId)
-    .then(post => {
-      if (!post) {
-        return res.status(404).send({ error: "Post not found" });
-      }
-
-      const comment = post.comments.id(commentId);
-      if (!comment) {
-        return res.status(404).send({ error: "Comment not found" });
-      }
-
-      if (comment.userId.toString() !== req.user.id && !req.user.isAdmin) {
-        return res.status(403).send({ error: "Unauthorized to delete this comment" });
-      }
-
-      post.comments.pull(commentId);
-      return post.save();
-    })
-    .then(updatedPost => {
-      res.status(200).send({
-        success: true,
-        message: "Comment deleted successfully",
-        comments: updatedPost.comments
+      .then(res => res.json())
+      .then(data => {
+        Swal.fire("Updated!", "Post updated successfully!", "success");
+        setShowEditModal(false);
+        navigate(`/posts/${editPostId}`);
+      })
+      .catch(() => {
+        Swal.fire("Error", "Failed to update post", "error");
       });
-    })
-    .catch(error => errorHandler(error, req, res));
-};
+  };
 
+  const openEditModal = (post) => {
+    setPostData({
+      title: post.title,
+      content: post.content,
+      coverImage: post.coverImage || ""
+    });
+    setEditPostId(post._id);
+    setShowEditModal(true);
+  };
 
-// [SECTION] get-post-comments
-module.exports.getPostComments = (req, res) => {
-    if (!req.user) {
-        return res.status(401).send({
-            auth: "Failed",
-            message: "User authentication required"
-        });
-    }
+  return (
+    <div className="container mt-4">
+      <Card className="shadow-sm">
+        <Card.Body>
+          <Card.Title>Add New Blog Post</Card.Title>
+          <Form onSubmit={handleSubmit}>
+            <Row className="g-3">
+              <Col md={12}>
+                <Form.Control
+                  type="text"
+                  name="title"
+                  placeholder="Post Title"
+                  value={postData.title}
+                  onChange={handleChange}
+                  required
+                />
+              </Col>
+              <Col md={12}>
+                <Form.Control
+                  type="text"
+                  name="coverImage"
+                  placeholder="Cover Image URL"
+                  value={postData.coverImage}
+                  onChange={handleChange}
+                />
+              </Col>
+              <Col md={12}>
+                <Form.Control
+                  as="textarea"
+                  name="content"
+                  rows={6}
+                  placeholder="Write your post content here..."
+                  value={postData.content}
+                  onChange={handleChange}
+                  required
+                />
+              </Col>
+              <Col md={12} className="text-end">
+                <Button type="submit" variant="primary">
+                  Submit Post
+                </Button>
+              </Col>
+            </Row>
+          </Form>
+        </Card.Body>
+      </Card>
 
-    const postId = req.params.postId;
-
-    Post.findById(postId)
-        .then(post => {
-            if (!post) {
-                return res.status(404).send({ error: "Post not found" });
+      {(user?.isAdmin || user) && (
+        <div className="mt-4 text-end">
+          <Button
+            variant="warning"
+            className="me-2"
+            onClick={() => navigate("/my-posts")}
+          >
+            Manage My Posts
+          </Button>
+          <Button
+            variant="info"
+            onClick={() =>
+              openEditModal({
+                _id: "EXISTING_POST_ID",
+                title: "Sample Title",
+                content: "Existing content",
+                coverImage: "https://..."
+              })
             }
+          >
+            Open Edit Modal (Demo)
+          </Button>
+        </div>
+      )}
 
-            res.status(200).send({
-                success: true,
-                comments: post.comments
-            });
-        })
-        .catch(error => errorHandler(error, req, res));
-};
-
+      {/* Edit Modal */}
+      <Modal show={showEditModal} onHide={() => setShowEditModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Edit Blog Post</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group className="mb-3">
+              <Form.Label>Title</Form.Label>
+              <Form.Control
+                name="title"
+                value={postData.title}
+                onChange={handleChange}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Cover Image URL</Form.Label>
+              <Form.Control
+                name="coverImage"
+                value={postData.coverImage}
+                onChange={handleChange}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Content</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={5}
+                name="content"
+                value={postData.content}
+                onChange={handleChange}
+              />
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowEditModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleUpdate}>
+            Save Changes
+          </Button>
+        </Modal.Footer>
+      </Modal>
+    </div>
+  );
+}
