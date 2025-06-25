@@ -14,7 +14,7 @@ const app = express();
 app.use(express.json());
 
 app.use(cors({
-	origin: ["http://localhost:8000", "https://blogapi-3cr8.onrender.com"]
+	origin: ["http://localhost:8000", "https://blogapi-3cr8.onrender.com", "https://blogapp-client-alx3.vercel.app"]
 }));
 
 // [SECTION] Database Connection
